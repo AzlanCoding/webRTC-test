@@ -51,6 +51,14 @@ function start()
     
         console.log("Got stream");
         console.log(stream);
+        let video = document.createElement("video");
+        var table = document.getElementById("vidGrp");
+        var tr = document.createElement("tr");
+        tr.setAttribute("name", "i");
+        table.appendChild(tr);
+        tr.appendChild(video)
+        video.srcObject = stream;
+        video.play();
 
         // Stream this!
         pc.addStream(stream);
