@@ -1,103 +1,118 @@
 <h>Host</h>
 <script>
-// Cope with browser differences.
-let audioContext;
-if (typeof AudioContext === 'function') {
-  audioContext = new AudioContext();
-} else if (typeof webkitAudioContext === 'function') {
-  audioContext = new webkitAudioContext(); // eslint-disable-line new-cap
-} else {
-  console.log('Sorry! Web Audio not supported.');
+//Adapted from https://research.edm.uhasselt.be/jori/page/Misc/QtWebRTC.html
+let pcConfig = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]};
+let pc = null;
+
+function error(e)
+{
+    console.log("Error: " + e);
 }
 
-// Create a filter node.
-var filterNode = audioContext.createBiquadFilter();
-// See https://dvcs.w3.org/hg/audio/raw-file/tip/webaudio/specification.html#BiquadFilterNode-section
-filterNode.type = 'highpass';
-// Cutoff frequency. For highpass, audio is attenuated below this frequency.
-filterNode.frequency.value = 10000;
+function start()
+{
+    if (pc)
+        return;
 
-// Create a gain node to change audio volume.
-var gainNode = audioContext.createGain();
-// Default is 1 (no change). Less than 1 means audio is attenuated
-// and vice versa.
-gainNode.gain.value = 0.5;
+    pc = new RTCPeerConnection(pcConfig);
+       
+    pc.ontrack = (obj) => {
 
-navigator.mediaDevices.getUserMedia({audio: true}, (stream) => {
-  // Create an AudioNode from the stream.
-  const mediaStreamSource =
-    audioContext.createMediaStreamSource(stream);
-  mediaStreamSource.connect(filterNode);
-  filterNode.connect(gainNode);
-  // Connect the gain node to the destination. For example, play the sound.
-  gainNode.connect(audioContext.destination);
-});
+        // Since we're only sending video, this should not be triggered
+        console.log("ontrack");
+        console.log(obj);
+        
+        if (!mediaStream)
+        {
+            let video = document.createElement("video");
+            mediaStream = new MediaStream();
+            video.srcObject = mediaStream;
+            video.play();
+        }
 
-
-
-// handles JSON.stringify/parse
-const signaling = new SignalingChannel();
-const constraints = {audio: true, video: true};
-const configuration = {iceServers: [{urls: 'stun1.l.google.com:19302'}]};
-const pc = new RTCPeerConnection(configuration);
-
-// Send any ice candidates to the other peer.
-pc.onicecandidate = ({candidate}) => signaling.send({candidate});
-
-// Let the "negotiationneeded" event trigger offer generation.
-pc.onnegotiationneeded = async () => {
-  try {
-    await pc.setLocalDescription(await pc.createOffer());
-    // Send the offer to the other peer.
-    signaling.send({desc: pc.localDescription});
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-// Once remote track media arrives, show it in remote video element.
-pc.ontrack = (event) => {
-  // Don't set srcObject again if it is already set.
-  if (remoteView.srcObject) return;
-  remoteView.srcObject = event.streams[0];
-};
-
-// Call start() to initiate.
-async function start() {
-  try {
-    // Get local stream, show it in self-view, and add it to be sent.
-    const stream =
-      await navigator.mediaDevices.getUserMedia(constraints);
-    stream.getTracks().forEach((track) =>
-      pc.addTrack(track, stream));
-    selfView.srcObject = stream;
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-signaling.onmessage = async ({desc, candidate}) => {
-  try {
-    if (desc) {
-      // If you get an offer, you need to reply with an answer.
-      if (desc.type === 'offer') {
-        await pc.setRemoteDescription(desc);
-        const stream =
-          await navigator.mediaDevices.getUserMedia(constraints);
-        stream.getTracks().forEach((track) =>
-          pc.addTrack(track, stream));
-        await pc.setLocalDescription(await pc.createAnswer());
-        signaling.send({desc: pc.localDescription});
-      } else if (desc.type === 'answer') {
-        await pc.setRemoteDescription(desc);
-      } else {
-        console.log('Unsupported SDP type.');
-      }
-    } else if (candidate) {
-      await pc.addIceCandidate(candidate);
+        mediaStream.addTrack(obj.track);
     }
-  } catch (err) {
-    console.error(err);
-  }
-};
+
+    pc.onicecandidate = (event) => {
+    
+        if (event.candidate)
+        {
+            let candidate = event.candidate; // has sdpMLineIndex, sdpMid, candidate
+            document.getElementById("icecandidates").value += JSON.stringify(candidate) + "\n";
+        }
+    }
+
+    navigator.mediaDevices.getUserMedia({video: true, audio: true}).then((stream) => {
+    
+        console.log("Got stream");
+        console.log(stream);
+
+        // Stream this!
+        pc.addStream(stream);
+
+        pc.createOffer().then((offer) => {
+        
+            pc.setLocalDescription(offer).then(() => {
+            
+                document.getElementById("offer").value = offer.sdp;
+
+            }).catch((error) => {
+                console.log("Error in setLocalDescription: " + error);
+            });
+        }).catch((error) => {
+            console.log("Error in createOffer: " + error);
+        });
+
+    }).catch((error) => {
+
+        console.log("Error in getUserMedia: " + error);
+    });
+}
+
+function processAnswer()
+{
+    let answer = document.getElementById("answer").value;
+    let answerSdp = { "sdp": answer, "type": "answer" };
+
+    pc.setRemoteDescription(answerSdp).then(() => {
+        console.log("Answer processed successfully");
+    }).catch((error) => {
+        console.log("Error in setRemoteDescription: " + error);
+    });
+}
+
+function processOtherIceCandidates()
+{
+    let candidates = document.getElementById("othericecandidates").value.split("\n");
+
+    for (let cand of candidates)
+    {
+        if (cand.trim().length == 0)
+            continue;
+
+        cand = JSON.parse(cand);
+        console.log(cand);
+        pc.addIceCandidate(cand);
+    }
+}
 </script>
+<button onclick="start()" id="start">Start</button>
+<button onclick="processAnswer()">Process answer</button>
+<button onclick="processOtherIceCandidates()">Process remote ICE candidates</button>
+<br>
+<table>
+<tr>
+<td>This is the SDP data that will need to be sent to the other side<br>
+<textarea id="offer" rows="20" cols="60"></textarea></td>
+<td>Paste the SDP info from the other side here and press 'process answer'<br>
+<textarea id="answer" rows="20" cols="60"></textarea></td>
+</tr>
+<tr>
+<td>This is ICE info for the local host, we'll need to send it to the remote end<br>
+<textarea id="icecandidates" rows="10" cols="60"></textarea></td>
+<td>Paste the ICE info from the remote host here and press 'process ICE candidates'<br>
+<textarea id="othericecandidates" rows="10" cols="60"></textarea></td>
+</tr>
+</table>
+
+<h>Video:</h>
