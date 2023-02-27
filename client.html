@@ -42,26 +42,38 @@ function start()
             document.getElementById("icecandidates").value += JSON.stringify(candidate) + "\n";
         }
     }
-
-    let offer = document.getElementById("offer").value;
-    let offerSdp = { "sdp": offer, "type": "offer" };
-
-    pc.setRemoteDescription(offerSdp).then(() => { 
     
-        pc.createAnswer().then((answer) => {
-        
-            pc.setLocalDescription(answer).then(() => { 
-            
-                document.getElementById("answer").value = answer.sdp;
+    navigator.mediaDevices.getUserMedia({video: true, audio: false}).then((stream) => {
+    
+        console.log("Got stream");
+        console.log(stream);
 
+        // Stream this!
+        pc.addStream(stream);
+
+        let offer = document.getElementById("offer").value;
+        let offerSdp = { "sdp": offer, "type": "offer" };
+
+        pc.setRemoteDescription(offerSdp).then(() => { 
+
+            pc.createAnswer().then((answer) => {
+
+                pc.setLocalDescription(answer).then(() => { 
+
+                    document.getElementById("answer").value = answer.sdp;
+
+                }).catch((error) => {
+                    console.log("Error in setLocalDescription: " + error);
+                });
             }).catch((error) => {
-                console.log("Error in setLocalDescription: " + error);
+                console.log("Error in createAnswer: " + error);
             });
         }).catch((error) => {
-            console.log("Error in createAnswer: " + error);
+            console.log("Error in setRemoteDescription: " + error);
         });
     }).catch((error) => {
-        console.log("Error in setRemoteDescription: " + error);
+
+        console.log("Error in getUserMedia: " + error);
     });
 }
 
