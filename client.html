@@ -25,6 +25,11 @@ function start()
         if (!mediaStream)
         {
             let video = document.createElement("video");
+            var table = document.getElementById("vidGrp");
+            var tr = document.createElement("tr");
+            tr.setAttribute("name", "i");
+            table.appendChild(tr);
+            tr.appendChild(video)
             mediaStream = new MediaStream();
             video.srcObject = mediaStream;
             video.play();
@@ -110,3 +115,5 @@ function processOtherIceCandidates()
 </table>
 
 <h>Video: </h>
+<table id="vidGrp">
+</table>
