@@ -3,6 +3,7 @@
 //Adapted from https://research.edm.uhasselt.be/jori/page/Misc/QtWebRTC.html
 let pcConfig = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]};
 let pc = null;
+let mediaStream = null;
 
 function error(e)
 {
