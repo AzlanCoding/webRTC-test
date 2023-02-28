@@ -57,7 +57,7 @@ function start()
         var tr = document.createElement("tr");
         tr.setAttribute("name", "i");
         table.appendChild(tr);
-        video.setAttribute("mute", true);
+        video.setAttribute("muted", true);
         tr.appendChild(video);
         video.srcObject = stream;
         video.play();
